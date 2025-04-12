@@ -1,70 +1,109 @@
-import Link from "next/link"
-import { redirect } from "next/navigation"
+"use client"
 
+import type React from "react"
+
+import { useState } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { auth, registerUser } from "@/lib/auth"
+import { useToast } from "@/hooks/use-toast"
+import { LinkIcon } from "lucide-react"
 
-export default async function RegisterPage() {
-  const session = await auth()
+export default function RegisterPage() {
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
+  const { toast } = useToast()
 
-  if (session?.user) {
-    redirect("/dashboard")
-  }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
 
-  async function handleRegister(formData: FormData) {
-    "use server"
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
 
-    const name = formData.get("name") as string
-    const email = formData.get("email") as string
-    const password = formData.get("password") as string
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          id: "1",
+          email,
+          name,
+        }),
+      )
 
-    if (!name || !email || !password) {
-      return
+      toast({
+        title: "Registration successful",
+        description: "Welcome to LinkShort!",
+      })
+
+      router.push("/dashboard")
+    } catch (error) {
+      toast({
+        title: "Something went wrong",
+        description: "Please try again later",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
-
-    await registerUser({ name, email, password })
-
-    redirect("/dashboard")
   }
 
   return (
-    <div className="container flex h-screen w-screen flex-col items-center justify-center">
-      <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
-        <div className="flex flex-col space-y-2 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">Create an account</h1>
-          <p className="text-sm text-gray-500">Enter your information below to create your account</p>
-        </div>
-        <div className="grid gap-6">
-          <form action={handleRegister}>
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Name</Label>
-                <Input id="name" name="name" placeholder="John Doe" required />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" name="email" type="email" placeholder="m@example.com" required />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="password">Password</Label>
-                <Input id="password" name="password" type="password" required />
-              </div>
-              <Button type="submit" className="w-full">
-                Create account
-              </Button>
+    <div className="flex min-h-screen flex-col">
+      <div className="container flex h-20 items-center border-b px-6">
+        <Link href="/" className="flex items-center gap-2">
+          <LinkIcon className="h-6 w-6 text-blue-500" />
+          <span className="text-xl font-bold">LinkShort</span>
+        </Link>
+      </div>
+      <div className="flex flex-1 items-center justify-center">
+        <div className="mx-auto w-full max-w-md space-y-8 px-6 py-8">
+          <div className="space-y-2 text-center">
+            <h1 className="text-3xl font-bold">Create an account</h1>
+            <p className="text-gray-500">Enter your information to get started</p>
+          </div>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input id="name" placeholder="John Doe" value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="john@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Creating account..." : "Create account"}
+            </Button>
           </form>
-        </div>
-        <div className="px-8 text-center text-sm text-gray-500">
-          Already have an account?{" "}
-          <Link href="/login" className="underline underline-offset-4 hover:text-gray-900">
-            Sign in
-          </Link>
+          <div className="text-center text-sm">
+            Already have an account?{" "}
+            <Link href="/login" className="font-medium underline underline-offset-4">
+              Login
+            </Link>
+          </div>
         </div>
       </div>
     </div>
   )
 }
-

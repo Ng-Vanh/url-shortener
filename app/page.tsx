@@ -1,76 +1,113 @@
 import Link from "next/link"
-import { redirect } from "next/navigation"
-import { ArrowRight } from "lucide-react"
-
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { shortenUrl } from "@/lib/actions"
-import { auth } from "@/lib/auth"
-import { HeroSection } from "@/components/hero-section"
-import { Features } from "@/components/features"
+import { ArrowRight, LinkIcon } from "lucide-react"
 
-export default async function Home() {
-  const session = await auth()
-
-  async function handleShortenUrl(formData: FormData) {
-    "use server"
-
-    const url = formData.get("url") as string
-
-    if (!url) {
-      return
-    }
-
-    await shortenUrl(url)
-
-    if (session?.user) {
-      redirect("/dashboard")
-    } else {
-      redirect("/success")
-    }
-  }
-
+export default function Home() {
   return (
     <div className="flex flex-col min-h-screen">
+      <header className="border-b">
+        <div className="container flex h-20 items-center justify-between px-6">
+          <div className="flex items-center gap-2">
+            <LinkIcon className="h-6 w-6 text-blue-500" />
+            <span className="text-xl font-bold">LinkShort</span>
+          </div>
+          <nav className="flex gap-4">
+            <Link href="/login">
+              <Button variant="ghost">Login</Button>
+            </Link>
+            <Link href="/register">
+              <Button>Sign Up</Button>
+            </Link>
+          </nav>
+        </div>
+      </header>
       <main className="flex-1">
-        <HeroSection />
-
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-gray-50">
-          <div className="container md:px-0">
+        <section className="py-28 md:py-36 lg:py-44 bg-gradient-to-b from-white to-blue-50">
+          <div className="container px-6 md:px-8">
             <div className="flex flex-col items-center space-y-4 text-center">
               <div className="space-y-2">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">Shorten Your URL</h2>
+                <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl">
+                  Shorten, share, and track your links
+                </h1>
                 <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl">
-                  Paste your long URL below and get a short link instantly.
+                  Create short links, QR Codes, and Link-in-bio pages. Share them anywhere. Track what's working, and
+                  what's not.
                 </p>
               </div>
               <div className="w-full max-w-md space-y-2">
-                <form className="flex w-full max-w-md flex-col gap-2 sm:flex-row" action={handleShortenUrl}>
-                  <Input
-                    name="url"
-                    className="flex-1"
-                    placeholder="https://example.com/very/long/url/that/needs/shortening"
-                    type="url"
-                    required
-                  />
-                  <Button type="submit" className="sm:w-auto">
-                    Shorten <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
+                <form className="flex w-full max-w-md flex-col gap-2">
+                  <div className="flex w-full items-center space-x-2">
+                    <Input type="url" placeholder="Paste your long URL" className="flex-1" required />
+                    <Button type="submit">
+                      Shorten
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
                 </form>
-                <p className="text-xs text-gray-500">
-                  By using our service you accept our{" "}
-                  <Link href="/terms" className="underline underline-offset-2">
-                    Terms of Service
-                  </Link>
-                </p>
               </div>
             </div>
           </div>
         </section>
-
-        <Features />
+        <section className="py-16 md:py-20 lg:py-24">
+          <div className="container px-6 md:px-8">
+            <div className="mx-auto grid max-w-5xl items-center gap-6 py-12 lg:grid-cols-2 lg:gap-12">
+              <div className="flex flex-col justify-center space-y-4">
+                <div className="space-y-2">
+                  <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">Track your link performance</h2>
+                  <p className="text-gray-500 md:text-xl">
+                    Get detailed insights on who's clicking your links, when, and where from.
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-lg border bg-background p-10">
+                <div className="flex flex-col gap-4">
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-bold">Link Statistics</h3>
+                    <p className="text-sm text-gray-500">Track clicks, locations, and devices</p>
+                  </div>
+                  <div className="grid gap-2">
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">Total Clicks</p>
+                        <p className="text-2xl font-bold">1,234</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">Mobile</p>
+                          <p className="text-xl font-bold">65%</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">Desktop</p>
+                          <p className="text-xl font-bold">35%</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
+      <footer className="border-t py-8 md:py-6">
+      <div className="container flex flex-col items-center justify-center gap-4 md:h-16 md:flex-row">
+        <p className="text-sm text-gray-500 text-center">&copy; {new Date().getFullYear()} LinkShort. All rights reserved.</p>
+        <nav className="flex gap-4 sm:gap-6 text-center">
+          <Link href="#" className="text-sm hover:underline underline-offset-4">
+            Terms
+          </Link>
+          <Link href="#" className="text-sm hover:underline underline-offset-4">
+            Privacy
+          </Link>
+        </nav>
+      </div>
+
+      </footer>
     </div>
   )
 }
-
