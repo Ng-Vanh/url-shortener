@@ -9,68 +9,70 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
-import { ArrowRight, Copy, LinkIcon, LogOut, Plus, Trash2, User } from "lucide-react"
+import { ArrowRight, Check, Copy, LinkIcon, LogOut, Plus, User } from "lucide-react"
 
-interface ShortenedUrl {
-  id: string
-  originalUrl: string
-  shortUrl: string
-  createdAt: string
-  clicks: number
-}
+import { urlApi, type ShortenedUrl } from "@/lib/api"
+import { clearAuthData, getCurrentUser, withAuth } from "@/lib/auth"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
-const mockUrls: ShortenedUrl[] = [
-  {
-    id: "1",
-    originalUrl: "https://www.example.com/very/long/url/that/needs/to/be/shortened/for/better/sharing",
-    shortUrl: "linkshort.io/abc123",
-    createdAt: "2023-04-15T10:30:00Z",
-    clicks: 145,
-  },
-  {
-    id: "2",
-    originalUrl: "https://www.verylongwebsiteaddress.com/article/how-to-create-short-links-for-better-engagement",
-    shortUrl: "linkshort.io/def456",
-    createdAt: "2023-04-10T14:20:00Z",
-    clicks: 89,
-  },
-  {
-    id: "3",
-    originalUrl: "https://www.examplestore.com/products/category/electronics/smartphones/latest-model",
-    shortUrl: "linkshort.io/ghi789",
-    createdAt: "2023-04-05T09:15:00Z",
-    clicks: 217,
-  },
-]
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
 
 export default function DashboardPage() {
   const [urls, setUrls] = useState<ShortenedUrl[]>([])
   const [longUrl, setLongUrl] = useState("")
+  const [customAlias, setCustomAlias] = useState("")
+  const [isCustomAlias, setIsCustomAlias] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingUrls, setIsLoadingUrls] = useState(true)
   const [user, setUser] = useState<{ name: string; email: string } | null>(null)
+  const [showCustomDialog, setShowCustomDialog] = useState(false)
+  const [recentlyCreatedUrl, setRecentlyCreatedUrl] = useState<ShortenedUrl | null>(null)
+  const [copied, setCopied] = useState(false)
+
   const router = useRouter()
   const { toast } = useToast()
 
+  // Check if user is logged in and fetch URLs
   useEffect(() => {
-    const userStr = localStorage.getItem("user")
-    if (!userStr) {
-      router.push("/login")
-      return
+    const checkAuth = async () => {
+      const currentUser = getCurrentUser()
+      console.log(currentUser)
+      if (!currentUser) {
+        router.push("/login")
+        return
+      }
+
+      setUser(currentUser)
+
+      try {
+        setIsLoadingUrls(true)
+        // Fetch user's URLs
+        const urlsData = await withAuth(() => urlApi.getAllUrls())
+        setUrls(urlsData)
+      } catch (error) {
+        toast({
+          title: "Failed to load URLs",
+          description: error instanceof Error ? error.message : "Please try again later",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoadingUrls(false)
+      }
     }
 
-    setUser(JSON.parse(userStr))
-
-    const savedUrls = localStorage.getItem("shortenedUrls")
-    if (savedUrls) {
-      setUrls(JSON.parse(savedUrls))
-    } else {
-      setUrls(mockUrls)
-      localStorage.setItem("shortenedUrls", JSON.stringify(mockUrls))
-    }
-  }, [router])
+    checkAuth()
+  }, [router, toast])
 
   const handleLogout = () => {
-    localStorage.removeItem("user")
+    clearAuthData()
     router.push("/")
   }
 
@@ -82,34 +84,35 @@ export default function DashboardPage() {
     setIsLoading(true)
 
     try {
-      // Simulate API call delay
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      let response
 
-      // Generate a random short code
-      const shortCode = Math.random().toString(36).substring(2, 8)
-
-      const newUrl: ShortenedUrl = {
-        id: Date.now().toString(),
-        originalUrl: longUrl,
-        shortUrl: `linkshort.io/${shortCode}`,
-        createdAt: new Date().toISOString(),
-        clicks: 0,
+      if (isCustomAlias && customAlias) {
+        // Create custom URL
+        response = await withAuth(() => urlApi.createCustomUrl(longUrl, customAlias))
+      } else {
+        // Create regular shortened URL
+        response = await withAuth(() => urlApi.createUrl(longUrl))
       }
 
-      const updatedUrls = [newUrl, ...urls]
-      setUrls(updatedUrls)
-      localStorage.setItem("shortenedUrls", JSON.stringify(updatedUrls))
+      setRecentlyCreatedUrl(response)
+      // Add the new URL to the list
+      setUrls([response, ...urls])
 
+
+      // Reset form
       setLongUrl("")
+      setCustomAlias("")
+      setIsCustomAlias(false)
+      setShowCustomDialog(false)
 
       toast({
         title: "URL shortened successfully",
-        description: `Your short URL: linkshort.io/${shortCode}`,
+        description: `Your short URL: ${response.shortUrl}`,
       })
     } catch (error) {
       toast({
         title: "Failed to shorten URL",
-        description: "Please try again later",
+        description: error instanceof Error ? error.message : "Please try again later",
         variant: "destructive",
       })
     } finally {
@@ -119,20 +122,15 @@ export default function DashboardPage() {
 
   const handleCopyUrl = (url: string) => {
     navigator.clipboard.writeText(url)
+
+    if (recentlyCreatedUrl && recentlyCreatedUrl.shortUrl === url) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+
     toast({
       title: "URL copied to clipboard",
       description: url,
-    })
-  }
-
-  const handleDeleteUrl = (id: string) => {
-    const updatedUrls = urls.filter((url) => url.id !== id)
-    setUrls(updatedUrls)
-    localStorage.setItem("shortenedUrls", JSON.stringify(updatedUrls))
-
-    toast({
-      title: "URL deleted",
-      description: "The shortened URL has been removed",
     })
   }
 
@@ -173,25 +171,62 @@ export default function DashboardPage() {
 
           <div className="rounded-lg border p-6 bg-blue-50">
             <h2 className="text-xl font-bold mb-4">Create new short link</h2>
-            <form onSubmit={handleShortenUrl} className="flex items-center gap-2">
-              <Input
-                type="url"
-                placeholder="Paste your long URL"
-                value={longUrl}
-                onChange={(e) => setLongUrl(e.target.value)}
-                className="flex-1"
-                required
-              />
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? (
-                  "Shortening..."
-                ) : (
-                  <>
-                    Shorten
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </Button>
+            <form onSubmit={handleShortenUrl} className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Input
+                  type="url"
+                  placeholder="Paste your long URL"
+                  value={longUrl}
+                  onChange={(e) => setLongUrl(e.target.value)}
+                  className="flex-1"
+                  required
+                />
+                <Button type="button" variant="outline" onClick={() => setShowCustomDialog(true)}>
+                  Custom
+                </Button>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? (
+                    "Shortening..."
+                  ) : (
+                    <>
+                      Shorten
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Recently created URL section */}
+              {recentlyCreatedUrl && (
+                <Alert className="bg-white border-blue-200 mt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-blue-800 mb-1">Your new shortened URL</p>
+                      <AlertDescription className="font-medium text-blue-600 break-all">
+                        {recentlyCreatedUrl.shortUrl}
+                      </AlertDescription>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 min-w-[80px]"
+                      onClick={() => handleCopyUrl(recentlyCreatedUrl.shortUrl)}
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="h-4 w-4 mr-1 text-green-500" />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4 mr-1" />
+                          Copy
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </Alert>
+              )}
             </form>
           </div>
 
@@ -204,7 +239,11 @@ export default function DashboardPage() {
               </Button>
             </div>
 
-            {urls.length > 0 ? (
+            {isLoadingUrls ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              </div>
+            ) : urls.length > 0 ? (
               <div className="rounded-md border p-1">
                 <Table>
                   <TableHeader className="bg-blue-50">
@@ -212,28 +251,24 @@ export default function DashboardPage() {
                       <TableHead>Original URL</TableHead>
                       <TableHead>Short URL</TableHead>
                       <TableHead>Created</TableHead>
-                      <TableHead>Clicks</TableHead>
+                      {/* <TableHead>Clicks</TableHead> */}
                       <TableHead className="w-[100px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {urls.map((url) => (
                       <TableRow key={url.id}>
-                        <TableCell className="max-w-[200px] truncate" title={url.originalUrl}>
-                          {url.originalUrl}
+                        <TableCell className="max-w-[200px] truncate" title={url.longUrl}>
+                          {url.longUrl}
                         </TableCell>
                         <TableCell>{url.shortUrl}</TableCell>
                         <TableCell>{formatDate(url.createdAt)}</TableCell>
-                        <TableCell>{url.clicks}</TableCell>
+                        {/* <TableCell>{url.clicks}</TableCell> */}
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Button variant="ghost" size="icon" onClick={() => handleCopyUrl(url.shortUrl)}>
                               <Copy className="h-4 w-4" />
                               <span className="sr-only">Copy</span>
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteUrl(url.id)}>
-                              <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">Delete</span>
                             </Button>
                           </div>
                         </TableCell>
@@ -261,6 +296,52 @@ export default function DashboardPage() {
           <p className="text-sm text-gray-500">&copy; {new Date().getFullYear()} LinkShort. All rights reserved.</p>
         </div>
       </footer>
+
+      {/* Custom Alias Dialog */}
+      <Dialog open={showCustomDialog} onOpenChange={setShowCustomDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Custom URL</DialogTitle>
+            <DialogDescription>Enter a custom alias for your shortened URL</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="longUrl">Original URL</Label>
+              <Input
+                id="longUrl"
+                value={longUrl}
+                onChange={(e) => setLongUrl(e.target.value)}
+                placeholder="https://example.com/very/long/url"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="customAlias">Custom Alias</Label>
+              <Input
+                id="customAlias"
+                value={customAlias}
+                onChange={(e) => setCustomAlias(e.target.value)}
+                placeholder="my-custom-link"
+                required
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCustomDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setIsCustomAlias(true)
+                handleShortenUrl(new Event("submit") as any)
+              }}
+              disabled={isLoading || !longUrl || !customAlias}
+            >
+              {isLoading ? "Creating..." : "Create Custom URL"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

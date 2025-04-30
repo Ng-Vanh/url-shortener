@@ -3,8 +3,8 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,35 +13,45 @@ import { LinkIcon } from "lucide-react"
 import { authApi } from "@/lib/api"
 import { saveAuthData } from "@/lib/auth"
 
-export default function LoginPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+export default function VerifyPage() {
+  const searchParams = useSearchParams()
+  const email = searchParams.get("email") || ""
+  const [verificationCode, setVerificationCode] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!email) {
+      toast({
+        title: "Email missing",
+        description: "Please go back to the registration page",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsLoading(true)
 
     try {
-      // Call the real login API
-      const response = await authApi.signin(email, password)
-      console.log("Login response:", response)
-      console.log("Login response:", response.user + " " + response.accessToken + " " + response.refreshToken) 
+      // Call the verification API
+      const response = await authApi.verifyCode(email, Number.parseInt(verificationCode))
+
       // Save auth data
-      saveAuthData(response); 
+      saveAuthData(response)
 
       toast({
-        title: "Login successful",
-        description: "Welcome back to LinkShort!",
+        title: "Verification successful",
+        description: "Your account has been verified!",
       })
 
       router.push("/dashboard")
     } catch (error) {
       toast({
-        title: "Login failed",
-        description: error instanceof Error ? error.message : "Invalid email or password",
+        title: "Verification failed",
+        description: error instanceof Error ? error.message : "Invalid verification code",
         variant: "destructive",
       })
     } finally {
@@ -60,44 +70,32 @@ export default function LoginPage() {
       <div className="flex flex-1 items-center justify-center">
         <div className="mx-auto w-full max-w-md space-y-8 px-6 py-8">
           <div className="space-y-2 text-center">
-            <h1 className="text-3xl font-bold">Login</h1>
-            <p className="text-gray-500">Enter your credentials to access your account</p>
+            <h1 className="text-3xl font-bold">Verify your email</h1>
+            <p className="text-gray-500">Enter the verification code sent to your email</p>
           </div>
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleVerify} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+              <Input id="email" type="email" value={email} disabled className="bg-gray-50" />
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <Link href="#" className="text-sm text-gray-500 hover:text-gray-900">
-                  Forgot password?
-                </Link>
-              </div>
+              <Label htmlFor="code">Verification Code</Label>
               <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                id="code"
+                placeholder="123456"
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value)}
                 required
               />
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Logging in..." : "Login"}
+              {isLoading ? "Verifying..." : "Verify Email"}
             </Button>
           </form>
           <div className="text-center text-sm">
-            Don&apos;t have an account?{" "}
+            Didn&apos;t receive a code?{" "}
             <Link href="/register" className="font-medium underline underline-offset-4">
-              Sign up
+              Go back to registration
             </Link>
           </div>
         </div>
