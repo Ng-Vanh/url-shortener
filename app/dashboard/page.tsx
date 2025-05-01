@@ -40,6 +40,8 @@ export default function DashboardPage() {
   const router = useRouter()
   const { toast } = useToast()
 
+  const SHORT_BASE_URL = "http://localhost:80/url/" // Replace with your actual base URL
+
   // Check if user is logged in and fetch URLs
   useEffect(() => {
     const checkAuth = async () => {
@@ -93,6 +95,7 @@ export default function DashboardPage() {
         // Create regular shortened URL
         response = await withAuth(() => urlApi.createUrl(longUrl))
       }
+      // response.shortUrl = `${SHORT_BASE_URL}${response.shortUrl}`
 
       setRecentlyCreatedUrl(response)
       // Add the new URL to the list
@@ -261,12 +264,12 @@ export default function DashboardPage() {
                         <TableCell className="max-w-[200px] truncate" title={url.longUrl}>
                           {url.longUrl}
                         </TableCell>
-                        <TableCell>{url.shortUrl}</TableCell>
+                        <TableCell>{ `${SHORT_BASE_URL}${url.shortUrl}`}</TableCell>
                         <TableCell>{formatDate(url.createdAt)}</TableCell>
                         {/* <TableCell>{url.clicks}</TableCell> */}
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleCopyUrl(url.shortUrl)}>
+                            <Button variant="ghost" size="icon" onClick={() => handleCopyUrl(`${SHORT_BASE_URL}${url.shortUrl}`)}>
                               <Copy className="h-4 w-4" />
                               <span className="sr-only">Copy</span>
                             </Button>

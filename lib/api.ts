@@ -29,6 +29,7 @@ export interface ShortenedUrl {
 // Base API URL
 const API_BASE_URL = "http://localhost:80"
 
+
 // Helper function to get auth headers
 const getAuthHeaders = () => {
   const accessToken = localStorage.getItem("accessToken")
@@ -204,20 +205,21 @@ export const urlApi = {
     return json.data
   },
 
-  getAllUrls: async (): Promise<ShortenedUrl[]> => {
-    const res = await fetch(`${API_BASE_URL}/url/all`, {
+  getAllUrls: async (page = 1, pageSize = 10): Promise<ShortenedUrl[]> => {
+    const res = await fetch(`${API_BASE_URL}/url/history?page=${page}&pageSize=${pageSize}`, {
       method: "GET",
       headers: getAuthHeaders(),
     })
-
+  
     if (!res.ok) {
       const error = await res.json()
       throw new Error(error.message || "Failed to get URLs")
     }
-
+  
     const json: ApiResponse<ShortenedUrl[]> = await res.json()
     return json.data
   },
+  
   // Resend verification code
  
 }

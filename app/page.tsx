@@ -23,7 +23,7 @@ export default function Home() {
         </div>
       </header>
       <main className="flex-1">
-        <section className="py-28 md:py-36 lg:py-44 bg-gradient-to-b from-white to-blue-50">
+        <section className="min-h-screen py-28 md:py-36 lg:py-44 bg-gradient-to-b from-white to-blue-100">
           <div className="container px-6 md:px-8">
             <div className="flex flex-col items-center space-y-4 text-center">
               <div className="space-y-2">
@@ -32,17 +32,26 @@ export default function Home() {
                 </h1>
                 <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl">
                   Create short links, QR Codes, and Link-in-bio pages. Share them anywhere. Track what's working, and
-                  what's not.
+                  what's not. Please login to use our service.
                 </p>
               </div>
               <div className="w-full max-w-md space-y-2">
                 <form className="flex w-full max-w-md flex-col gap-2">
                   <div className="flex w-full items-center space-x-2">
-                    <Input type="url" placeholder="Paste your long URL" className="flex-1" required />
+                    {/* <Input type="url" placeholder="Paste your long URL" className="flex-1" required />
                     <Button type="submit">
                       Shorten
                       <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button> */}
+                    <Link href="/login" className="w-full flex justify-center">
+                    <Button
+                      variant="outline"
+                      className="transition duration-300 ease-in-out border-blue-200 text-blue-500 hover:bg-blue-500 hover:text-white px-6 py-3 rounded-lg text-lg shadow-md"
+                    >
+                      Click here to Login
                     </Button>
+                  </Link>
+
                   </div>
                 </form>
               </div>
