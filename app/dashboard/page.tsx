@@ -45,12 +45,57 @@ export default function DashboardPage() {
   const [urlToDelete, setUrlToDelete] = useState<ShortenedUrl | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
+  const [totalUrls, setTotalUrls] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+
 
   const router = useRouter()
   const { toast } = useToast()
-  const totalPages = Math.max(1, Math.ceil(urls.length / ROWS_PER_PAGE))
+  // const totalPages = Math.max(1, Math.ceil(urls.length / ROWS_PER_PAGE))
 
   const SHORT_BASE_URL = "http://localhost:80/url/" // Replace with your actual base URL
+
+  const fetchUrls = async (page: number) => {
+    try {
+      setIsLoadingUrls(true)
+
+      // Direct API call to the endpoint
+      const accessToken = localStorage.getItem("accessToken")
+      const response = await fetch(`http://localhost/url/history?page=${page}&pageSize=${ROWS_PER_PAGE}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: accessToken ? `Bearer ${accessToken}` : "",
+        },
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || "Failed to get URLs")
+      }
+
+      const result = await response.json()
+
+      // Parse the response according to the provided structure
+      setUrls(result.data.urls)
+      setTotalPages(result.data.totalPages)
+
+      // Calculate total URLs based on total pages and rows per page
+      // This is an estimate since we don't have the exact count
+      const lastPageItems =
+        result.data.urls.length > 0 && page === result.data.totalPages ? result.data.urls.length : ROWS_PER_PAGE
+      const estimatedTotal = (result.data.totalPages - 1) * ROWS_PER_PAGE + lastPageItems
+      setTotalUrls(estimatedTotal)
+    } catch (error) {
+      toast({
+        title: "Failed to load URLs",
+        description: error instanceof Error ? error.message : "Please try again later",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoadingUrls(false)
+    }
+  }
 
   // Check if user is logged in and fetch URLs
   useEffect(() => {
@@ -64,81 +109,84 @@ export default function DashboardPage() {
 
       setUser(currentUser)
 
-      try {
-        setIsLoadingUrls(true)
-        // Fetch user's URLs
-        const urlsData = await withAuth(() => urlApi.getAllUrls())
-        setUrls(urlsData)
-      } catch (error) {
-        toast({
-          title: "Failed to load URLs",
-          description: error instanceof Error ? error.message : "Please try again later",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoadingUrls(false)
-      }
+     	
+      fetchUrls(currentPage)
     }
 
     checkAuth()
   }, [router, toast])
 
+  useEffect(() => {
+    if (user) {
+      fetchUrls(currentPage)
+    }
+  }, [currentPage])
   const handleLogout = () => {
     clearAuthData()
     router.push("/")
   }
 
 
-  const handleShortenUrl = async (
-    e?: React.FormEvent | null,
-    options?: { useCustomAlias?: boolean; customAlias?: string }
-  ) => {
-    if (e) e.preventDefault(); // Prevent form submission
-  
-    if (!longUrl) return; // Ensure there's a long URL to shorten
-  
-    setIsLoading(true);
-  
-    try {
-      let response: ShortenedUrl;
-  
-      const useCustom = options?.useCustomAlias && options.customAlias;
-  
-      if (useCustom && options.customAlias) {
-        // Ensure customAlias is not undefined before passing to API
-        response = await withAuth(() =>
-          urlApi.createCustomUrl(longUrl, options.customAlias || "")
-        );
-      } else {
-        // Default shortening without custom alias
-        response = await withAuth(() => urlApi.createUrl(longUrl));
-      }
-      console.log(response._id);
+  const handleShortenUrl = async (e: React.FormEvent) => {
+    e.preventDefault()
 
-  
-      setRecentlyCreatedUrl(response);
-      setUrls([response, ...urls]);
-      setLongUrl("");
-      setCustomAlias("");
-      setIsCustomAlias(false);
-      setShowCustomDialog(false);
-      console.log(`Your short URL: ${SHORT_BASE_URL + response.shortUrl}`);
-      setCurrentPage(1)
+    if (!longUrl) return
+
+    setIsLoading(true)
+
+    try {
+      let response: ShortenedUrl
+
+      if (isCustomAlias && customAlias) {
+        // Create custom URL
+        response = await withAuth(() => urlApi.createCustomUrl(longUrl, customAlias))
+      } else {
+        // Create regular shortened URL
+        response = await withAuth(() => urlApi.createUrl(longUrl))
+      }
+
+      // Set the recently created URL
+      setRecentlyCreatedUrl(response)
+
+      // If we're on the first page, update the URLs list by adding the new URL
+      // and removing the last one if needed to maintain page size
+      if (currentPage === 1) {
+        setUrls((prevUrls) => {
+          const newUrls = [response, ...prevUrls]
+          if (newUrls.length > ROWS_PER_PAGE) {
+            return newUrls.slice(0, ROWS_PER_PAGE)
+          }
+          return newUrls
+        })
+
+        // Update total count estimate
+        setTotalUrls((prev) => prev + 1)
+        setTotalPages((prev) => Math.ceil((totalUrls + 1) / ROWS_PER_PAGE))
+      } else {
+        // If not on first page, go to first page to see the new URL
+        setCurrentPage(1)
+      }
+
+      // Reset form
+      setLongUrl("")
+      setCustomAlias("")
+      setIsCustomAlias(false)
+      setShowCustomDialog(false)
+
       toast({
         title: "URL shortened successfully",
-        description: `Your short URL: ${SHORT_BASE_URL + response.shortUrl}`,
-        variant: "default",
-      });
+        description: `Your short URL has been created`,
+      })
     } catch (error) {
       toast({
         title: "Failed to shorten URL",
         description: error instanceof Error ? error.message : "Please try again later",
         variant: "destructive",
-      });
+      })
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
   
   
   const handleDeleteClick = (url: ShortenedUrl) => {
@@ -149,24 +197,24 @@ export default function DashboardPage() {
 
   const handleDeleteConfirm = async () => {
     if (!urlToDelete) return
-    console.log(urlToDelete._id)
 
     setIsDeleting(true)
-
+    console.log(urlToDelete._id)
 
     try {
       // Call the delete API
       await withAuth(() => urlApi.deleteUrl(urlToDelete._id))
 
-      // Remove the URL from the list
-      const updatedUrls = urls.filter((url) => url._id !== urlToDelete._id)
-      setUrls(updatedUrls)
+      // Update our estimate of total URLs
+      setTotalUrls((prev) => Math.max(0, prev - 1))
 
-      // Adjust current page if needed
-      if (updatedUrls.length === 0) {
-        setCurrentPage(1)
-      } else if (Math.ceil(updatedUrls.length / ROWS_PER_PAGE) < currentPage) {
-        setCurrentPage(Math.ceil(updatedUrls.length / ROWS_PER_PAGE))
+      // If we deleted the last item on the current page and it's not page 1,
+      // go to the previous page
+      if (urls.length === 1 && currentPage > 1) {
+        setCurrentPage((prev) => prev - 1)
+      } else {
+        // Otherwise, refetch the current page
+        fetchUrls(currentPage)
       }
 
       toast({
@@ -206,11 +254,7 @@ export default function DashboardPage() {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString()
   }
-  // Get current page's URLs
-  const getCurrentPageUrls = () => {
-    const startIndex = (currentPage - 1) * ROWS_PER_PAGE
-    return urls.slice(startIndex, startIndex + ROWS_PER_PAGE)
-  }
+
 
   // Handle page navigation
   const goToPage = (page: number) => {
@@ -275,7 +319,6 @@ export default function DashboardPage() {
     return pageNumbers
   }
 
-  const currentPageUrls = getCurrentPageUrls()
   const pageNumbers = getPageNumbers()
 
 
@@ -385,7 +428,7 @@ export default function DashboardPage() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
               </div>
             ) : urls.length > 0 ? (
-              <div className="rounded-md border p-1">
+              <div className="rounded-md border">
                 <Table>
                   <TableHeader className="bg-blue-50">
                     <TableRow>
@@ -397,7 +440,7 @@ export default function DashboardPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {currentPageUrls.map((url)  => (
+                    {urls.map((url)  => (
                       <TableRow key={url._id}>
                         <TableCell className="max-w-[200px] truncate" title={url.longUrl}>
                           {url.longUrl}
@@ -426,19 +469,20 @@ export default function DashboardPage() {
                     ))}
                   </TableBody>
                 </Table>
-                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t">
-                  <div className="text-sm text-gray-500">
+                 {/* Pagination */}
+                 <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t">
+                  {/* <div className="text-sm text-gray-500">
                     Showing{" "}
-                    <span className="font-medium">{urls.length > 0 ? (currentPage - 1) * ROWS_PER_PAGE + 1 : 0}</span>{" "}
-                    to <span className="font-medium">{Math.min(currentPage * ROWS_PER_PAGE, urls.length)}</span> of{" "}
-                    <span className="font-medium">{urls.length}</span> results
-                  </div>
+                    <span className="font-medium">{totalUrls > 0 ? (currentPage - 1) * ROWS_PER_PAGE + 1 : 0}</span> to{" "}
+                    <span className="font-medium">{Math.min(currentPage * ROWS_PER_PAGE, totalUrls)}</span> of{" "}
+                    <span className="font-medium">{totalUrls}</span> results
+                  </div> */}
                   <div className="flex items-center space-x-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={goToPreviousPage}
-                      disabled={currentPage === 1}
+                      disabled={currentPage === 1 || isLoadingUrls}
                       className="h-8 w-8 p-0"
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -456,6 +500,7 @@ export default function DashboardPage() {
                           variant={currentPage === page ? "default" : "outline"}
                           size="sm"
                           onClick={() => goToPage(page as number)}
+                          disabled={isLoadingUrls}
                           className={`h-8 w-8 p-0 ${currentPage === page ? "bg-blue-500" : ""}`}
                         >
                           {page}
@@ -467,7 +512,7 @@ export default function DashboardPage() {
                       variant="outline"
                       size="sm"
                       onClick={goToNextPage}
-                      disabled={currentPage === totalPages}
+                      disabled={currentPage === totalPages || isLoadingUrls}
                       className="h-8 w-8 p-0"
                     >
                       <ChevronRight className="h-4 w-4" />
@@ -530,16 +575,15 @@ export default function DashboardPage() {
               Cancel
             </Button>
             <Button
-              onClick={() =>
-                handleShortenUrl(null, {
-                  useCustomAlias: true,
-                  customAlias: customAlias.trim(),
-                })
-              }
+              onClick={() => {
+                setIsCustomAlias(true)
+                handleShortenUrl(new Event("submit") as any)
+              }}
               disabled={isLoading || !longUrl || !customAlias}
             >
               {isLoading ? "Creating..." : "Create Custom URL"}
-          </Button>
+            </Button>
+            
           </DialogFooter>
         </DialogContent>
       </Dialog>

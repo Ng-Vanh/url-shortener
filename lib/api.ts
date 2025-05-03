@@ -206,20 +206,7 @@ export const urlApi = {
     return json.data
   },
 
-  getAllUrls: async (page = 1, pageSize = 10): Promise<ShortenedUrl[]> => {
-    const res = await fetch(`${API_BASE_URL}/url/history?page=${page}&pageSize=${pageSize}`, {
-      method: "GET",
-      headers: getAuthHeaders(),
-    })
-  
-    if (!res.ok) {
-      const error = await res.json()
-      throw new Error(error.message || "Failed to get URLs")
-    }
-  
-    const json: ApiResponse<ShortenedUrl[]> = await res.json()
-    return json.data
-  },
+
   
   // Delete a URL
   deleteUrl: async (urlId: string): Promise<any> => {
@@ -227,6 +214,7 @@ export const urlApi = {
       method: "DELETE",
       headers: getAuthHeaders(),
     })
+
 
     if (!response.ok) {
       const error = await response.json()
