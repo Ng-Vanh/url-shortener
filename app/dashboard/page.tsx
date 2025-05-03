@@ -78,48 +78,59 @@ export default function DashboardPage() {
     router.push("/")
   }
 
+
   const handleShortenUrl = async (
-    e?: React.FormEvent,
+    e?: React.FormEvent | null,
     options?: { useCustomAlias?: boolean; customAlias?: string }
   ) => {
-    if (e) e.preventDefault()
-    if (!longUrl) return
+    if (e) e.preventDefault(); // Prevent form submission
   
-    setIsLoading(true)
+    if (!longUrl) return; // Ensure there's a long URL to shorten
+  
+    setIsLoading(true);
   
     try {
-      let response: ShortenedUrl
+      let response: ShortenedUrl;
   
-      const useCustom = options?.useCustomAlias && options.customAlias
+      const useCustom = options?.useCustomAlias && options.customAlias;
   
-      if (useCustom) {
-        response = await withAuth(() => urlApi.createCustomUrl(longUrl, options!.customAlias!))
+      if (useCustom && options.customAlias) {
+        // Ensure customAlias is not undefined before passing to API
+        response = await withAuth(() =>
+          urlApi.createCustomUrl(longUrl, options.customAlias || "")
+        );
       } else {
-        response = await withAuth(() => urlApi.createUrl(longUrl))
+        // Default shortening without custom alias
+        response = await withAuth(() => urlApi.createUrl(longUrl));
       }
+      console.log(response);
+
   
-      setRecentlyCreatedUrl(response)
-      setUrls([response, ...urls])
-      setLongUrl("")
-      setCustomAlias("")
-      setIsCustomAlias(false)
-      setShowCustomDialog(false)
+      setRecentlyCreatedUrl(response);
+      setUrls([response, ...urls]);
+      setLongUrl("");
+      setCustomAlias("");
+      setIsCustomAlias(false);
+      setShowCustomDialog(false);
+      console.log(`Your short URL: ${SHORT_BASE_URL + response.shortUrl}`);
   
       toast({
         title: "URL shortened successfully",
         description: `Your short URL: ${SHORT_BASE_URL + response.shortUrl}`,
         variant: "default",
-      })
+      });
     } catch (error) {
       toast({
         title: "Failed to shorten URL",
         description: error instanceof Error ? error.message : "Please try again later",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
+  
+  
   
 
   const handleCopyUrl = (url: string) => {
@@ -335,7 +346,7 @@ export default function DashboardPage() {
             </Button>
             <Button
               onClick={() =>
-                handleShortenUrl(undefined, {
+                handleShortenUrl(null, {
                   useCustomAlias: true,
                   customAlias: customAlias.trim(),
                 })

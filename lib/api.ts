@@ -180,15 +180,16 @@ export const urlApi = {
       headers: getAuthHeaders(),
       body: JSON.stringify({ url, customizedEnpoint }),
     })
-
+  
     if (!res.ok) {
       const error = await res.json()
       throw new Error(error.message || "Failed to create custom URL")
     }
-
-    const json: ApiResponse<ShortenedUrl> = await res.json()
-    return json.data
+  
+    const json: ApiResponse<ShortenedUrl[]> = await res.json()  // Chú ý kiểu dữ liệu là mảng ShortenedUrl
+    return json.data[0]  // Trả về phần tử đầu tiên trong mảng
   },
+  
 
   getUrl: async (name: string): Promise<ShortenedUrl> => {
     const res = await fetch(`${API_BASE_URL}/url/${name}`, {
