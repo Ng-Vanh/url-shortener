@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
-import { ArrowRight, Check, Copy, LinkIcon, LogOut, Plus, User } from "lucide-react"
+import { ArrowRight, Check, ChevronLeft, ChevronRight, Copy, LinkIcon, LogOut, Plus, User, Trash2, AlertCircle } from "lucide-react"
 
 import { urlApi, type ShortenedUrl } from "@/lib/api"
 import { clearAuthData, getCurrentUser, withAuth } from "@/lib/auth"
@@ -25,6 +25,9 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 
+const ROWS_PER_PAGE = 5
+
+
 export default function DashboardPage() {
   const [urls, setUrls] = useState<ShortenedUrl[]>([])
   const [longUrl, setLongUrl] = useState("")
@@ -36,9 +39,16 @@ export default function DashboardPage() {
   const [showCustomDialog, setShowCustomDialog] = useState(false)
   const [recentlyCreatedUrl, setRecentlyCreatedUrl] = useState<ShortenedUrl | null>(null)
   const [copied, setCopied] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [urlToDelete, setUrlToDelete] = useState<ShortenedUrl | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
 
   const router = useRouter()
   const { toast } = useToast()
+  const totalPages = Math.max(1, Math.ceil(urls.length / ROWS_PER_PAGE))
 
   const SHORT_BASE_URL = "http://localhost:80/url/" // Replace with your actual base URL
 
@@ -103,7 +113,7 @@ export default function DashboardPage() {
         // Default shortening without custom alias
         response = await withAuth(() => urlApi.createUrl(longUrl));
       }
-      console.log(response);
+      console.log(response._id);
 
   
       setRecentlyCreatedUrl(response);
@@ -113,7 +123,7 @@ export default function DashboardPage() {
       setIsCustomAlias(false);
       setShowCustomDialog(false);
       console.log(`Your short URL: ${SHORT_BASE_URL + response.shortUrl}`);
-  
+      setCurrentPage(1)
       toast({
         title: "URL shortened successfully",
         description: `Your short URL: ${SHORT_BASE_URL + response.shortUrl}`,
@@ -131,7 +141,52 @@ export default function DashboardPage() {
   };
   
   
-  
+  const handleDeleteClick = (url: ShortenedUrl) => {
+    setUrlToDelete(url)
+    console.log(url._id)
+    setShowDeleteDialog(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!urlToDelete) return
+    console.log(urlToDelete._id)
+
+    setIsDeleting(true)
+
+
+    try {
+      // Call the delete API
+      await withAuth(() => urlApi.deleteUrl(urlToDelete._id))
+
+      // Remove the URL from the list
+      const updatedUrls = urls.filter((url) => url._id !== urlToDelete._id)
+      setUrls(updatedUrls)
+
+      // Adjust current page if needed
+      if (updatedUrls.length === 0) {
+        setCurrentPage(1)
+      } else if (Math.ceil(updatedUrls.length / ROWS_PER_PAGE) < currentPage) {
+        setCurrentPage(Math.ceil(updatedUrls.length / ROWS_PER_PAGE))
+      }
+
+      toast({
+        title: "URL deleted successfully",
+        description: "The shortened URL has been removed",
+      })
+
+      // Close the dialog
+      setShowDeleteDialog(false)
+      setUrlToDelete(null)
+    } catch (error) {
+      toast({
+        title: "Failed to delete URL",
+        description: error instanceof Error ? error.message : "Please try again later",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   const handleCopyUrl = (url: string) => {
     navigator.clipboard.writeText(url)
@@ -151,6 +206,78 @@ export default function DashboardPage() {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString()
   }
+  // Get current page's URLs
+  const getCurrentPageUrls = () => {
+    const startIndex = (currentPage - 1) * ROWS_PER_PAGE
+    return urls.slice(startIndex, startIndex + ROWS_PER_PAGE)
+  }
+
+  // Handle page navigation
+  const goToPage = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  const goToPreviousPage = () => {
+    setCurrentPage((prev) => Math.max(1, prev - 1))
+  }
+
+  const goToNextPage = () => {
+    setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+  }
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pageNumbers = []
+    const maxVisiblePages = 5
+
+    if (totalPages <= maxVisiblePages) {
+      // Show all pages if total pages is less than or equal to max visible pages
+      for (let i = 1; i <= totalPages; i++) {
+        pageNumbers.push(i)
+      }
+    } else {
+      // Always show first page
+      pageNumbers.push(1)
+
+      // Calculate start and end of visible pages
+      let startPage = Math.max(2, currentPage - 1)
+      let endPage = Math.min(totalPages - 1, currentPage + 1)
+
+      // Adjust if we're near the beginning
+      if (currentPage <= 3) {
+        endPage = Math.min(totalPages - 1, 4)
+      }
+
+      // Adjust if we're near the end
+      if (currentPage >= totalPages - 2) {
+        startPage = Math.max(2, totalPages - 3)
+      }
+
+      // Add ellipsis after first page if needed
+      if (startPage > 2) {
+        pageNumbers.push("...")
+      }
+
+      // Add visible page numbers
+      for (let i = startPage; i <= endPage; i++) {
+        pageNumbers.push(i)
+      }
+
+      // Add ellipsis before last page if needed
+      if (endPage < totalPages - 1) {
+        pageNumbers.push("...")
+      }
+
+      // Always show last page
+      pageNumbers.push(totalPages)
+    }
+
+    return pageNumbers
+  }
+
+  const currentPageUrls = getCurrentPageUrls()
+  const pageNumbers = getPageNumbers()
+
 
   if (!user) {
     return null // Will redirect to login
@@ -270,8 +397,8 @@ export default function DashboardPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {urls.map((url) => (
-                      <TableRow key={url.id}>
+                    {currentPageUrls.map((url)  => (
+                      <TableRow key={url._id}>
                         <TableCell className="max-w-[200px] truncate" title={url.longUrl}>
                           {url.longUrl}
                         </TableCell>
@@ -284,12 +411,70 @@ export default function DashboardPage() {
                               <Copy className="h-4 w-4" />
                               <span className="sr-only">Copy</span>
                             </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => handleDeleteClick(url)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Delete</span>
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t">
+                  <div className="text-sm text-gray-500">
+                    Showing{" "}
+                    <span className="font-medium">{urls.length > 0 ? (currentPage - 1) * ROWS_PER_PAGE + 1 : 0}</span>{" "}
+                    to <span className="font-medium">{Math.min(currentPage * ROWS_PER_PAGE, urls.length)}</span> of{" "}
+                    <span className="font-medium">{urls.length}</span> results
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToPreviousPage}
+                      disabled={currentPage === 1}
+                      className="h-8 w-8 p-0"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      <span className="sr-only">Previous</span>
+                    </Button>
+
+                    {pageNumbers.map((page, index) =>
+                      page === "..." ? (
+                        <span key={`ellipsis-${index}`} className="px-2">
+                          ...
+                        </span>
+                      ) : (
+                        <Button
+                          key={`page-${page}`}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => goToPage(page as number)}
+                          className={`h-8 w-8 p-0 ${currentPage === page ? "bg-blue-500" : ""}`}
+                        >
+                          {page}
+                        </Button>
+                      ),
+                    )}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToNextPage}
+                      disabled={currentPage === totalPages}
+                      className="h-8 w-8 p-0"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                      <span className="sr-only">Next</span>
+                    </Button>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="rounded-lg border border-dashed p-8 text-center">
@@ -355,6 +540,37 @@ export default function DashboardPage() {
             >
               {isLoading ? "Creating..." : "Create Custom URL"}
           </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-5 w-5" />
+              Confirm Deletion
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this shortened URL? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {urlToDelete && (
+            <div className="py-4">
+              <div className="rounded-md bg-gray-50 p-3 text-sm">
+                <p className="font-medium text-gray-700">Short URL:</p>
+                <p className="mt-1 break-all text-gray-600">{SHORT_BASE_URL+urlToDelete.shortUrl}</p>
+                <p className="mt-2 font-medium text-gray-700">Original URL:</p>
+                <p className="mt-1 break-all text-gray-600">{urlToDelete.longUrl}</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isDeleting}>
+              {isDeleting ? "Deleting..." : "Delete URL"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

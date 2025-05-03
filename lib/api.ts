@@ -19,7 +19,7 @@ export interface AuthResponse {
 }
 
 export interface ShortenedUrl {
-  id: string
+  _id: string
   longUrl: string
   shortUrl: string
   createdAt: string
@@ -221,6 +221,19 @@ export const urlApi = {
     return json.data
   },
   
-  // Resend verification code
+  // Delete a URL
+  deleteUrl: async (urlId: string): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/url/${urlId}`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.message || "Failed to delete URL")
+    }
+
+    return response.json()
+  },
  
 }
