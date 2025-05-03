@@ -78,39 +78,37 @@ export default function DashboardPage() {
     router.push("/")
   }
 
-  const handleShortenUrl = async (e: React.FormEvent) => {
-    e.preventDefault()
-
+  const handleShortenUrl = async (
+    e?: React.FormEvent,
+    options?: { useCustomAlias?: boolean; customAlias?: string }
+  ) => {
+    if (e) e.preventDefault()
     if (!longUrl) return
-
+  
     setIsLoading(true)
-
+  
     try {
-      let response
-
-      if (isCustomAlias && customAlias) {
-        // Create custom URL
-        response = await withAuth(() => urlApi.createCustomUrl(longUrl, customAlias))
+      let response: ShortenedUrl
+  
+      const useCustom = options?.useCustomAlias && options.customAlias
+  
+      if (useCustom) {
+        response = await withAuth(() => urlApi.createCustomUrl(longUrl, options!.customAlias!))
       } else {
-        // Create regular shortened URL
         response = await withAuth(() => urlApi.createUrl(longUrl))
       }
-      // response.shortUrl = `${SHORT_BASE_URL}${response.shortUrl}`
-
+  
       setRecentlyCreatedUrl(response)
-      // Add the new URL to the list
       setUrls([response, ...urls])
-
-
-      // Reset form
       setLongUrl("")
       setCustomAlias("")
       setIsCustomAlias(false)
       setShowCustomDialog(false)
-
+  
       toast({
         title: "URL shortened successfully",
-        description: `Your short URL: ${response.shortUrl}`,
+        description: `Your short URL: ${SHORT_BASE_URL + response.shortUrl}`,
+        variant: "default",
       })
     } catch (error) {
       toast({
@@ -122,6 +120,7 @@ export default function DashboardPage() {
       setIsLoading(false)
     }
   }
+  
 
   const handleCopyUrl = (url: string) => {
     navigator.clipboard.writeText(url)
@@ -133,7 +132,8 @@ export default function DashboardPage() {
 
     toast({
       title: "URL copied to clipboard",
-      description: url,
+      description: SHORT_BASE_URL+url,
+      variant: "default"
     })
   }
 
@@ -206,7 +206,7 @@ export default function DashboardPage() {
                     <div>
                       <p className="text-sm font-medium text-blue-800 mb-1">Your new shortened URL</p>
                       <AlertDescription className="font-medium text-blue-600 break-all">
-                        {recentlyCreatedUrl.shortUrl}
+                        {SHORT_BASE_URL+recentlyCreatedUrl.shortUrl}
                       </AlertDescription>
                     </div>
                     <Button
@@ -334,14 +334,16 @@ export default function DashboardPage() {
               Cancel
             </Button>
             <Button
-              onClick={() => {
-                setIsCustomAlias(true)
-                handleShortenUrl(new Event("submit") as any)
-              }}
+              onClick={() =>
+                handleShortenUrl(undefined, {
+                  useCustomAlias: true,
+                  customAlias: customAlias.trim(),
+                })
+              }
               disabled={isLoading || !longUrl || !customAlias}
             >
               {isLoading ? "Creating..." : "Create Custom URL"}
-            </Button>
+          </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

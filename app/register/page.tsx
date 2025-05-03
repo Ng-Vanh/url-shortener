@@ -69,6 +69,7 @@ export default function RegisterPage() {
       toast({
         title: "Registration initiated",
         description: "Please check your email for a verification code",
+        variant: "default"
       })
     } catch (error) {
       toast({
@@ -95,6 +96,7 @@ export default function RegisterPage() {
       toast({
         title: "Verification successful",
         description: "Your account has been verified!",
+        variant: "default"
       })
 
       router.push("/dashboard")
@@ -123,6 +125,7 @@ export default function RegisterPage() {
       toast({
         title: "Verification code resent",
         description: "Please check your email for the new code",
+        variant: "default"
       })
     } catch (error) {
       toast({

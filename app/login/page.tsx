@@ -35,6 +35,7 @@ export default function LoginPage() {
       toast({
         title: "Login successful",
         description: "Welcome back to LinkShort!",
+        variant: "default"
       })
 
       router.push("/dashboard")
