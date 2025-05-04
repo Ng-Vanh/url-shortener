@@ -127,55 +127,37 @@ export default function DashboardPage() {
   }
 
 
-  const handleShortenUrl = async (e: React.FormEvent) => {
-    e.preventDefault()
-
+  const handleShortenUrl = async (
+    e?: React.FormEvent,
+    options?: { useCustomAlias?: boolean; customAlias?: string }
+  ) => {
+    if (e) e.preventDefault()
     if (!longUrl) return
-
+  
     setIsLoading(true)
-
+  
     try {
       let response: ShortenedUrl
-
-      if (isCustomAlias && customAlias) {
-        // Create custom URL
-        response = await withAuth(() => urlApi.createCustomUrl(longUrl, customAlias))
+  
+      const useCustom = options?.useCustomAlias && options.customAlias
+  
+      if (useCustom) {
+        response = await withAuth(() => urlApi.createCustomUrl(longUrl, options!.customAlias!))
       } else {
-        // Create regular shortened URL
         response = await withAuth(() => urlApi.createUrl(longUrl))
       }
-
-      // Set the recently created URL
+  
       setRecentlyCreatedUrl(response)
-
-      // If we're on the first page, update the URLs list by adding the new URL
-      // and removing the last one if needed to maintain page size
-      if (currentPage === 1) {
-        setUrls((prevUrls) => {
-          const newUrls = [response, ...prevUrls]
-          if (newUrls.length > ROWS_PER_PAGE) {
-            return newUrls.slice(0, ROWS_PER_PAGE)
-          }
-          return newUrls
-        })
-
-        // Update total count estimate
-        setTotalUrls((prev) => prev + 1)
-        setTotalPages((prev) => Math.ceil((totalUrls + 1) / ROWS_PER_PAGE))
-      } else {
-        // If not on first page, go to first page to see the new URL
-        setCurrentPage(1)
-      }
-
-      // Reset form
+      setUrls([response, ...urls])
       setLongUrl("")
       setCustomAlias("")
       setIsCustomAlias(false)
       setShowCustomDialog(false)
-
+  
       toast({
         title: "URL shortened successfully",
-        description: `Your short URL has been created`,
+        description: `Your short URL: ${SHORT_BASE_URL + response.shortUrl}`,
+        variant: "default",
       })
     } catch (error) {
       toast({
@@ -187,6 +169,7 @@ export default function DashboardPage() {
       setIsLoading(false)
     }
   }
+  
   
   
   const handleDeleteClick = (url: ShortenedUrl) => {
@@ -575,14 +558,17 @@ export default function DashboardPage() {
               Cancel
             </Button>
             <Button
-              onClick={() => {
-                setIsCustomAlias(true)
-                handleShortenUrl(new Event("submit") as any)
-              }}
+              onClick={() =>
+                handleShortenUrl(undefined, {
+                  useCustomAlias: true,
+                  customAlias: customAlias.trim(),
+                })
+              }
               disabled={isLoading || !longUrl || !customAlias}
             >
               {isLoading ? "Creating..." : "Create Custom URL"}
             </Button>
+
             
           </DialogFooter>
         </DialogContent>
