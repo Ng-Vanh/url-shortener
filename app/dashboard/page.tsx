@@ -137,8 +137,11 @@ export default function DashboardPage() {
     try {
       let response: ShortenedUrl
 
+      console.log(isCustomAlias, customAlias, "value ....");
+
       if (isCustomAlias && customAlias) {
         // Create custom URL
+        console.log(isCustomAlias, customAlias, "value ....");
         response = await withAuth(() => urlApi.createCustomUrl(longUrl, customAlias))
       } else {
         // Create regular shortened URL
@@ -365,7 +368,11 @@ export default function DashboardPage() {
                   className="flex-1"
                   required
                 />
-                <Button type="button" variant="outline" onClick={() => setShowCustomDialog(true)}>
+                <Button type="button" variant="outline" onClick={() => 
+                  {
+                    setIsCustomAlias(true)
+                    setShowCustomDialog(true)
+                  }}>
                   Custom
                 </Button>
                 <Button type="submit" disabled={isLoading}>
