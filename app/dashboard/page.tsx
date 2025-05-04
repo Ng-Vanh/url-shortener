@@ -56,46 +56,88 @@ export default function DashboardPage() {
   const SHORT_BASE_URL = "http://localhost:80/url/" // Replace with your actual base URL
 
   const fetchUrls = async (page: number) => {
+    const url = `http://localhost/url/history?page=${page}&pageSize=${ROWS_PER_PAGE}`
+  
+    const authFetch = async (input: RequestInfo, init?: RequestInit): Promise<Response> => {
+      let res = await fetch(input, init)
+  
+      if (res.status === 401) {
+        try {
+          const refreshRes = await fetch("http://localhost/auth/refresh", {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${localStorage.getItem("refreshToken")}`,
+            },
+          })
+  
+          if (!refreshRes.ok) throw new Error("Refresh failed")
+  
+          const data = await refreshRes.json()
+  
+          localStorage.setItem("accessToken", data.data.accessToken)
+          localStorage.setItem("refreshToken", data.data.refreshToken)
+          localStorage.setItem("user", JSON.stringify(data.data.user))
+  
+          const retryInit = {
+            ...init,
+            headers: {
+              ...(init?.headers || {}),
+              Authorization: `Bearer ${data.data.accessToken}`,
+            },
+          }
+  
+          res = await fetch(input, retryInit)
+        } catch (err) {
+          localStorage.clear()
+          throw new Error("Session expired. Please login again.")
+        }
+      }
+  
+      return res
+    }
+  
     try {
       setIsLoadingUrls(true)
-
-      // Direct API call to the endpoint
-      const accessToken = localStorage.getItem("accessToken")
-      const response = await fetch(`http://localhost/url/history?page=${page}&pageSize=${ROWS_PER_PAGE}`, {
+  
+      const res = await authFetch(url, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          Authorization: accessToken ? `Bearer ${accessToken}` : "",
+          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
         },
       })
-
-      if (!response.ok) {
-        const error = await response.json()
+  
+      if (!res.ok) {
+        const error = await res.json()
         throw new Error(error.message || "Failed to get URLs")
       }
-
-      const result = await response.json()
-
-      // Parse the response according to the provided structure
+  
+      const result = await res.json()
       setUrls(result.data.urls)
       setTotalPages(result.data.totalPages)
-
-      // Calculate total URLs based on total pages and rows per page
-      // This is an estimate since we don't have the exact count
+  
       const lastPageItems =
-        result.data.urls.length > 0 && page === result.data.totalPages ? result.data.urls.length : ROWS_PER_PAGE
-      const estimatedTotal = (result.data.totalPages - 1) * ROWS_PER_PAGE + lastPageItems
+        result.data.urls.length > 0 && page === result.data.totalPages
+          ? result.data.urls.length
+          : ROWS_PER_PAGE
+  
+      const estimatedTotal =
+        (result.data.totalPages - 1) * ROWS_PER_PAGE + lastPageItems
+  
       setTotalUrls(estimatedTotal)
     } catch (error) {
       toast({
         title: "Failed to load URLs",
-        description: error instanceof Error ? error.message : "Please try again later",
+        description:
+          error instanceof Error ? error.message : "Please try again later",
         variant: "destructive",
       })
     } finally {
       setIsLoadingUrls(false)
     }
   }
+  
 
   // Check if user is logged in and fetch URLs
   useEffect(() => {

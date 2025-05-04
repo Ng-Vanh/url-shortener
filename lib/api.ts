@@ -38,6 +38,37 @@ const getAuthHeaders = () => {
     Authorization: accessToken ? `Bearer ${accessToken}` : "",
   }
 }
+async function authFetch(input: RequestInfo, init?: RequestInit): Promise<Response> {
+  let res = await fetch(input, {
+    ...init,
+    headers: {
+      ...init?.headers,
+      ...getAuthHeaders(),
+    },
+  });
+
+  if (res.status === 401) {
+    try {
+      const newAuth = await authApi.refresh();
+      localStorage.setItem("accessToken", newAuth.accessToken);
+      localStorage.setItem("refreshToken", newAuth.refreshToken);
+      localStorage.setItem("user", JSON.stringify(newAuth.user));
+
+      res = await fetch(input, {
+        ...init,
+        headers: {
+          ...init?.headers,
+          ...getAuthHeaders(),
+        },
+      });
+    } catch (err) {
+      throw new Error("Session expired. Please login again.");
+    }
+  }
+
+  return res;
+}
+
 
 // Authentication APIs
 export const authApi = {
@@ -134,7 +165,7 @@ export const authApi = {
 // URL APIs
 export const urlApi = {
   createUrl: async (url: string): Promise<ShortenedUrl> => {
-    let res = await fetch(`${API_BASE_URL}/url/create`, {
+    let res = await authFetch(`${API_BASE_URL}/url/create`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ url }),
@@ -175,7 +206,7 @@ export const urlApi = {
   
 
   createCustomUrl: async (url: string, customizedEnpoint: string): Promise<ShortenedUrl> => {
-    const res = await fetch(`${API_BASE_URL}/url/alias`, {
+    const res = await authFetch(`${API_BASE_URL}/url/alias`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ url, customizedEnpoint }),
@@ -192,7 +223,7 @@ export const urlApi = {
   
 
   getUrl: async (name: string): Promise<ShortenedUrl> => {
-    const res = await fetch(`${API_BASE_URL}/url/${name}`, {
+    const res = await authFetch(`${API_BASE_URL}/url/${name}`, {
       method: "GET",
       headers: getAuthHeaders(),
     })
@@ -210,7 +241,7 @@ export const urlApi = {
   
   // Delete a URL
   deleteUrl: async (urlId: string): Promise<any> => {
-    const response = await fetch(`${API_BASE_URL}/url/${urlId}`, {
+    const response = await authFetch(`${API_BASE_URL}/url/${urlId}`, {
       method: "DELETE",
       headers: getAuthHeaders(),
     })
