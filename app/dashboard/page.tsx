@@ -159,10 +159,11 @@ export default function DashboardPage() {
   }, [router, toast])
 
   useEffect(() => {
-    if (user) {
+    if (user && currentPage !== 1) {
       fetchUrls(currentPage)
     }
   }, [currentPage])
+  
   const handleLogout = () => {
     clearAuthData()
     router.push("/")
@@ -201,6 +202,11 @@ export default function DashboardPage() {
         description: `Your short URL: ${SHORT_BASE_URL + response.shortUrl}`,
         variant: "default",
       })
+      await fetchUrls(1)
+      setCurrentPage(1)
+  
+     
+  
     } catch (error) {
       toast({
         title: "Failed to shorten URL",
@@ -236,11 +242,15 @@ export default function DashboardPage() {
       // If we deleted the last item on the current page and it's not page 1,
       // go to the previous page
       if (urls.length === 1 && currentPage > 1) {
-        setCurrentPage((prev) => prev - 1)
+        setCurrentPage((prev) => {
+          const newPage = prev - 1
+          fetchUrls(newPage)
+          return newPage
+        })
       } else {
-        // Otherwise, refetch the current page
         fetchUrls(currentPage)
       }
+      
 
       toast({
         title: "URL deleted successfully",
@@ -442,10 +452,10 @@ export default function DashboardPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold">Your links</h2>
-              <Button variant="outline" size="sm">
+              {/* <Button variant="outline" size="sm">
                 <Plus className="mr-2 h-4 w-4" />
                 Export
-              </Button>
+              </Button> */}
             </div>
 
             {isLoadingUrls ? (
